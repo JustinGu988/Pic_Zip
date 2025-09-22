@@ -8,6 +8,7 @@ from PIL import Image
 ORIGINAL_FOLDER_PATH = r"C:\Users\Administrator\Desktop\test"
 ZIP_JPG = True
 ZIP_PNG = True
+VALID_SIZE = 2 * 1024 * 1024  # 2MB
 
 # PILLOW 压缩设定
 PILLOW_QUALITY = 95  # 质量
@@ -25,8 +26,10 @@ def compress_jpgs(folder_path):
     for file_name in os.listdir(folder_path):
         file_path = os.path.join(folder_path, file_name)
         original_size = os.path.getsize(file_path)
+
+        # 设定文件类型和大小
         valid_file = file_name.lower().endswith((".jpg", ".png"))
-        valid_size = 2 * 1024 * 1024  # 2MB
+        valid_size = VALID_SIZE
 
         # 判断文件类型和大小
         if valid_file & (original_size <= valid_size):
