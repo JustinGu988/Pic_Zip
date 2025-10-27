@@ -2,54 +2,192 @@ import os
 import pyautogui  # pip install pyautogui
 import time
 import subprocess
+import tkinter as tk
+from tkinter import filedialog
+from tkinter import messagebox
 from PIL import Image
 
-# 开关
-ORIGINAL_FOLDER_PATH = r"C:\Users\Administrator\Desktop\test"
-ZIP_JPG = True
-ZIP_PNG = True
-VALID_SIZE = 2 * 1024 * 1024  # 2MB
 
-# PILLOW 压缩设定
-PILLOW_QUALITY = 95  # 质量
-PILLOW_SUBSAMPLING = 0  # 色度抽样, 0 = 4:4:4, 1 = 4:2:2, 2 = 4:2:0
+# 压缩图片Function
+# 包含 def jpg_pillow、def jpg_pillow、def print_output 和压缩功能
+def start_compressing(
+    folder_path,
+    ZIP_JPG,
+    ZIP_PNG,
+    valid_size,
+    PILLOW_QUALITY,
+    PILLOW_SUBSAMPLING,
+):
 
+    # 用pillow压缩jpg
+    def jpg_pillow(file_path):
+        new_path = os.path.splitext(file_path)[0] + "_dwnsiz.jpg"
+        with Image.open(file_path) as img:
+            img.save(
+                new_path,
+                format="JPEG",
+                quality=PILLOW_QUALITY,
+                subsampling=PILLOW_SUBSAMPLING,
+                optimize=True,
+                progressive=True,
+            )
+        os.remove(file_path)  # 删除原始文件
+        return new_path
 
-def compress_jpgs(folder_path):
+    # 用pillow压缩png
+    def png_pillow(file_path):
+        # 生成输出路径
+        output_dir = os.path.join(os.path.dirname(file_path), "pngToJpg")
+        os.makedirs(output_dir, exist_ok=True)
+
+        # 生成目标文件名
+        jpg_path = os.path.join(
+            output_dir, os.path.splitext(os.path.basename(file_path))[0] + "_dwnsiz.jpg"
+        )
+
+        with Image.open(file_path) as img:
+            rgb_img = img.convert("RGB")
+            rgb_img.save(
+                jpg_path,
+                format="JPEG",
+                quality=PILLOW_QUALITY,
+                subsampling=PILLOW_SUBSAMPLING,
+                optimize=True,
+                progressive=True,
+            )
+
+        os.remove(file_path)  # 删除原始 PNG
+        return jpg_path
+
+    # 控制台输出size变化
+    def print_output(original_size, new_size, convert_type, file_name):
+        ratio = (new_size - original_size) / original_size * 100
+        print(
+            f"{original_size/1024/1024:.2f} MB → "
+            + f"{new_size/1024/1024:.2f} MB ({ratio:.1f}%): "
+            + f"{convert_type}, {file_name}"
+        )
+
     # 确保路径存在
     if not os.path.isdir(folder_path):
         print(f"目录不存在: {folder_path}")
         return
 
-    print(f"开始遍历文件夹中的 JPG PNG: {folder_path}\n")
+    print(f"开始遍历文件夹中的图片: {folder_path}\n")
 
     for file_name in os.listdir(folder_path):
         file_path = os.path.join(folder_path, file_name)
         original_size = os.path.getsize(file_path)
 
-        # 设定文件类型和大小
+        # 设定文件类型（避免选取文件夹）
         valid_file = file_name.lower().endswith((".jpg", ".png"))
-        valid_size = VALID_SIZE
 
         # 判断文件类型和大小
         if valid_file & (original_size <= valid_size):
-            print_output(original_size, original_size, "  <=2MB  ", file_name)
+            print_output(original_size, original_size, "  <MB  ", file_name)
 
         elif valid_file & (original_size > valid_size):
 
-            # 处理JPG
-            if file_name.lower().endswith(".jpg") & ZIP_JPG:
-                # 调用方法
-                jpg_use_pillow(file_path)
-                new_size = os.path.getsize(file_path)
-                print_output(original_size, new_size, "  JPG  ", file_name)
+            # 处理 JPG
+            if file_name.lower().endswith(".jpg") and ZIP_JPG:
+                new_path = jpg_pillow(file_path)
+                new_size = os.path.getsize(new_path)
+                print_output(
+                    original_size, new_size, "  JPG  ", os.path.basename(new_path)
+                )
 
-            # 处理PNG
-            elif file_name.lower().endswith(".png") & ZIP_PNG:
-                jpg_path = png_use_pillow(file_path)
-                new_size = os.path.getsize(jpg_path)
-                print_output(original_size, new_size, "PNG→JPG", file_name)
-                # os.remove(file_path)  # 删除原始 PNG
+            # 处理 PNG
+            elif file_name.lower().endswith(".png") and ZIP_PNG:
+                new_path = png_pillow(file_path)
+                new_size = os.path.getsize(new_path)
+                print_output(
+                    original_size, new_size, "PNG→JPG", os.path.basename(new_path)
+                )
+
+
+# GUI页面Function
+def get_user_settings():
+    def browse_folder():
+        folder = filedialog.askdirectory(title="选择图片文件夹")
+        entry_path.delete(0, tk.END)
+        entry_path.insert(0, folder)
+
+    def confirm():
+        global ORIGINAL_FOLDER_PATH, ZIP_JPG, ZIP_PNG, VALID_SIZE, PILLOW_QUALITY, PILLOW_SUBSAMPLING
+        ORIGINAL_FOLDER_PATH = entry_path.get()
+        ZIP_JPG = var_jpg.get()
+        ZIP_PNG = var_png.get()
+        VALID_SIZE = int(entry_valid_size.get()) * 1024 * 1024
+        PILLOW_QUALITY = int(entry_quality.get())
+        PILLOW_SUBSAMPLING = int(entry_subsampling.get())
+
+        # GUI调用压缩Function
+        confirm_delete = messagebox.askokcancel(
+            "确认操作", "开始处理后将删除原始图片文件。\n是否继续？", icon="warning"
+        )
+
+        if confirm_delete:
+            print(
+                f"ORIGINAL_FOLDER_PATH = {ORIGINAL_FOLDER_PATH}, "
+                + f"ZIP_JPG = {ZIP_JPG}, "
+                + f"ZIP_PNG = {ZIP_PNG}, "
+                + f"VALID_SIZE = {entry_valid_size}, "
+                + f"PILLOW_QUALITY = {PILLOW_QUALITY}, "
+                + f"PILLOW_SUBSAMPLING = {PILLOW_SUBSAMPLING}"
+            )
+            root.destroy()
+            start_compressing(
+                ORIGINAL_FOLDER_PATH,
+                ZIP_JPG,
+                ZIP_PNG,
+                VALID_SIZE,
+                PILLOW_QUALITY,
+                PILLOW_SUBSAMPLING,
+            )
+
+    root = tk.Tk()
+    root.title("图片压缩设置")
+    root.geometry("840x320")
+
+    # 文件夹路径
+    tk.Label(root, text="文件夹路径:").grid(row=0, column=0, sticky="e", pady=5)
+    entry_path = tk.Entry(root, width=40)
+    entry_path.grid(row=0, column=1, padx=5)
+    tk.Button(root, text="浏览...", command=browse_folder).grid(row=0, column=2, padx=5)
+
+    # 勾选框
+    var_jpg = tk.BooleanVar(value=True)
+    var_png = tk.BooleanVar(value=True)
+    tk.Checkbutton(root, text="压缩 JPG", variable=var_jpg).grid(
+        row=1, column=1, sticky="w"
+    )
+    tk.Checkbutton(root, text="转存 PNG→JPG", variable=var_png).grid(
+        row=2, column=1, sticky="w"
+    )
+
+    # 数值输入
+    tk.Label(root, text="最小有效大小 (MB):").grid(row=3, column=0, sticky="e", pady=5)
+    entry_valid_size = tk.Entry(root, width=10)
+    entry_valid_size.insert(0, "2")
+    entry_valid_size.grid(row=3, column=1, sticky="w")
+
+    tk.Label(root, text="JPEG 质量 (0-100):").grid(row=4, column=0, sticky="e", pady=5)
+    entry_quality = tk.Entry(root, width=10)
+    entry_quality.insert(0, "95")
+    entry_quality.grid(row=4, column=1, sticky="w")
+
+    tk.Label(root, text="色度抽样 (0=4:4:4, 1=4:2:2, 2=4:2:0):").grid(
+        row=5, column=0, sticky="e", pady=5
+    )
+    entry_subsampling = tk.Entry(root, width=10)
+    entry_subsampling.insert(0, "0")
+    entry_subsampling.grid(row=5, column=1, sticky="w")
+
+    tk.Button(
+        root, text="确认并开始", command=confirm, width=20, bg="#4CAF50", fg="white"
+    ).grid(row=6, column=1, pady=20)
+
+    root.mainloop()
 
 
 def jpg_use_mspaint(file_path):
@@ -66,54 +204,5 @@ def jpg_use_mspaint(file_path):
     time.sleep(0.5)
 
 
-def jpg_use_pillow(file_path):
-    with Image.open(file_path) as img:
-        img.save(
-            file_path,  # 覆盖原文件
-            format="JPEG",
-            quality=PILLOW_QUALITY,
-            subsampling=PILLOW_SUBSAMPLING,
-            optimize=True,  # 优化 Huffman 表
-            progressive=True,  # 渐进式 JPEG
-        )
-
-
-def png_use_pillow(file_path):
-    # 生成输出路径
-    output_dir = os.path.join(os.path.dirname(file_path), "pngToJpg")
-    os.makedirs(
-        output_dir, exist_ok=True
-    )  # 自动创建 pngToJpg 文件夹（如果已存在就忽略）
-
-    # 转换的JPG图片存入pngToJpg，并覆盖同名文件
-    jpg_path = os.path.join(
-        os.path.dirname(file_path),  # 取到当前 PNG 所在的文件夹路径
-        "pngToJpg",  # 在这个路径下新建一个子文件夹 pngToJpg
-        os.path.splitext(os.path.basename(file_path))[0]
-        + ".jpg",  # PNG 文件名去掉扩展名，加上 .jpg
-    )
-
-    with Image.open(file_path) as img:
-        rgb_img = img.convert("RGB")
-        rgb_img.save(
-            jpg_path,
-            format="JPEG",
-            quality=PILLOW_QUALITY,
-            subsampling=PILLOW_SUBSAMPLING,
-            optimize=True,
-            progressive=True,
-        )
-    return jpg_path
-
-
-def print_output(original_size, new_size, convert_type, file_name):
-    ratio = (new_size - original_size) / original_size * 100
-    print(
-        f"{original_size/1024/1024:.2f} MB → "
-        + f"{new_size/1024/1024:.2f} MB ({ratio:.1f}%): "
-        + f"{convert_type}, {file_name}"
-    )
-
-
-# 使用方法：替换为你的文件夹路径
-compress_jpgs(f"{ORIGINAL_FOLDER_PATH}")
+# 调用 GUI 获取输入
+get_user_settings()
