@@ -7,10 +7,13 @@ from tkinter import filedialog
 from tkinter import messagebox
 from PIL import Image
 
+METHOD_PILLOW = "P"
+METHOD_MSPAINT = "M"
 
-# 压缩图片Function
-# 包含 def jpg_pillow、def jpg_pillow、def print_output 和压缩功能
-def start_compressing(
+
+# 转存功能：判定条件、选取转存方法、输出size变化
+def start_conversion(
+    conversion_method,
     folder_path,
     ZIP_JPG,
     ZIP_PNG,
@@ -19,6 +22,65 @@ def start_compressing(
     PILLOW_SUBSAMPLING,
 ):
 
+    # 控制台输出size变化
+    def print_output(original_size, new_size, convert_type, file_name):
+        ratio = (new_size - original_size) / original_size * 100
+        print(
+            f"{original_size/1024/1024:.2f} MB → "
+            + f"{new_size/1024/1024:.2f} MB ({ratio:.1f}%): "
+            + f"{convert_type}, {file_name}"
+        )
+
+    # 确保路径存在
+    if not os.path.isdir(folder_path):
+        print(f"目录不存在: {folder_path}")
+        return
+
+    print(f"开始遍历文件夹中的图片: {folder_path}\n")
+
+    for file_name in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, file_name)
+        original_size = os.path.getsize(file_path)
+
+        # 设定文件类型（避免选取文件夹）
+        valid_file = file_name.lower().endswith((".jpg", ".png"))
+
+        # 判断文件类型和大小
+        if valid_file and (original_size <= valid_size):
+            print_output(original_size, original_size, "  <MB  ", file_name)
+
+        elif valid_file and (original_size > valid_size):
+            if file_name.lower().endswith(".jpg") and ZIP_JPG:
+                new_path = allocate_conversion_method(
+                    conversion_method,
+                    "jpg",
+                    file_path,
+                    PILLOW_QUALITY,
+                    PILLOW_SUBSAMPLING,
+                )
+                new_size = os.path.getsize(new_path)
+                print_output(
+                    original_size, new_size, "  JPG  ", os.path.basename(new_path)
+                )
+
+            elif file_name.lower().endswith(".png") and ZIP_PNG:
+                new_path = allocate_conversion_method(
+                    conversion_method,
+                    "png",
+                    file_path,
+                    PILLOW_QUALITY,
+                    PILLOW_SUBSAMPLING,
+                )
+                new_size = os.path.getsize(new_path)
+                print_output(
+                    original_size, new_size, "PNG→JPG", os.path.basename(new_path)
+                )
+
+
+# 转存功能：根据 conversion_method、file_type 选取转存方法
+def allocate_conversion_method(
+    conversion_method, file_type, file_path, PILLOW_QUALITY, PILLOW_SUBSAMPLING
+):
     # 用pillow压缩jpg
     def jpg_pillow(file_path):
         new_path = os.path.splitext(file_path)[0] + "_dwnsiz.jpg"
@@ -59,54 +121,47 @@ def start_compressing(
         os.remove(file_path)  # 删除原始 PNG
         return jpg_path
 
-    # 控制台输出size变化
-    def print_output(original_size, new_size, convert_type, file_name):
-        ratio = (new_size - original_size) / original_size * 100
-        print(
-            f"{original_size/1024/1024:.2f} MB → "
-            + f"{new_size/1024/1024:.2f} MB ({ratio:.1f}%): "
-            + f"{convert_type}, {file_name}"
+    if conversion_method == METHOD_PILLOW and file_type == "jpg":
+        return jpg_pillow(file_path)
+    elif conversion_method == METHOD_PILLOW and file_type == "png":
+        return png_pillow(file_path)
+    else:
+        raise ValueError(
+            f"allocate_conversion_method() 无法判定: conversion_method={conversion_method}, file_type={file_type}"
         )
 
-    # 确保路径存在
-    if not os.path.isdir(folder_path):
-        print(f"目录不存在: {folder_path}")
-        return
 
-    print(f"开始遍历文件夹中的图片: {folder_path}\n")
+# GUI页面：选取转存方式
+def get_method_gui():
+    def confirm_choice():
+        global CHOOSE_METHOD
+        CHOOSE_METHOD = var_choice.get()
+        root.destroy()
 
-    for file_name in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, file_name)
-        original_size = os.path.getsize(file_path)
+    root = tk.Tk()
+    root.title("选择转存方式")
+    root.geometry("300x180")
 
-        # 设定文件类型（避免选取文件夹）
-        valid_file = file_name.lower().endswith((".jpg", ".png"))
+    var_choice = tk.StringVar(value="pillow")
 
-        # 判断文件类型和大小
-        if valid_file & (original_size <= valid_size):
-            print_output(original_size, original_size, "  <MB  ", file_name)
+    tk.Label(root, text="选择图片转存方式：", font=("Microsoft YaHei", 11)).pack(
+        pady=15
+    )
+    tk.Radiobutton(root, text="Pillow", variable=var_choice, value=METHOD_PILLOW).pack(
+        anchor="w", padx=60
+    )
+    tk.Radiobutton(
+        root, text="MSPaint", variable=var_choice, value=METHOD_MSPAINT
+    ).pack(anchor="w", padx=60)
+    tk.Button(
+        root, text="确认", command=confirm_choice, bg="#4CAF50", fg="white", width=10
+    ).pack(pady=15)
 
-        elif valid_file & (original_size > valid_size):
-
-            # 处理 JPG
-            if file_name.lower().endswith(".jpg") and ZIP_JPG:
-                new_path = jpg_pillow(file_path)
-                new_size = os.path.getsize(new_path)
-                print_output(
-                    original_size, new_size, "  JPG  ", os.path.basename(new_path)
-                )
-
-            # 处理 PNG
-            elif file_name.lower().endswith(".png") and ZIP_PNG:
-                new_path = png_pillow(file_path)
-                new_size = os.path.getsize(new_path)
-                print_output(
-                    original_size, new_size, "PNG→JPG", os.path.basename(new_path)
-                )
+    root.mainloop()
 
 
-# GUI页面Function
-def get_user_settings():
+# GUI页面：Pillow转存
+def get_pillow_settings():
     def browse_folder():
         folder = filedialog.askdirectory(title="选择图片文件夹")
         entry_path.delete(0, tk.END)
@@ -136,7 +191,8 @@ def get_user_settings():
                 + f"PILLOW_SUBSAMPLING = {PILLOW_SUBSAMPLING}"
             )
             root.destroy()
-            start_compressing(
+            start_conversion(
+                METHOD_PILLOW,
                 ORIGINAL_FOLDER_PATH,
                 ZIP_JPG,
                 ZIP_PNG,
@@ -190,6 +246,7 @@ def get_user_settings():
     root.mainloop()
 
 
+# GUI页面：MSPaint转存
 def jpg_use_mspaint(file_path):
     # 打开画图
     subprocess.Popen(["mspaint.exe", file_path])
@@ -205,4 +262,6 @@ def jpg_use_mspaint(file_path):
 
 
 # 调用 GUI 获取输入
-get_user_settings()
+get_method_gui()
+if CHOOSE_METHOD == METHOD_PILLOW:
+    get_pillow_settings()
