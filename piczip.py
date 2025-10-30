@@ -1,7 +1,8 @@
 import os
-import pyautogui  # pip install pyautogui
 import time
 import subprocess
+import pyautogui  # pip install pyautogui
+import pyperclip  # pip install pyperclip
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
@@ -15,11 +16,11 @@ METHOD_MSPAINT = "M"
 def start_conversion(
     conversion_method,
     folder_path,
-    ZIP_JPG,
-    ZIP_PNG,
+    zip_jpg,
+    zip_png,
     valid_size,
-    PILLOW_QUALITY,
-    PILLOW_SUBSAMPLING,
+    pillow_quality,
+    pillow_subsampling,
 ):
 
     # 控制台输出size变化
@@ -46,60 +47,63 @@ def start_conversion(
         valid_file = file_name.lower().endswith((".jpg", ".png"))
 
         # 判断文件类型和大小
-        if valid_file and (original_size <= valid_size):
+        if valid_file and original_size <= valid_size:
             print_output(original_size, original_size, "  <MB  ", file_name)
 
-        elif valid_file and (original_size > valid_size):
-            if file_name.lower().endswith(".jpg") and ZIP_JPG:
+        elif valid_file and original_size > valid_size:
+            if file_name.lower().endswith(".jpg") and zip_jpg:
                 new_path = allocate_conversion_method(
                     conversion_method,
                     "jpg",
                     file_path,
-                    PILLOW_QUALITY,
-                    PILLOW_SUBSAMPLING,
+                    pillow_quality,
+                    pillow_subsampling,
                 )
                 new_size = os.path.getsize(new_path)
                 print_output(
                     original_size, new_size, "  JPG  ", os.path.basename(new_path)
                 )
 
-            elif file_name.lower().endswith(".png") and ZIP_PNG:
+            elif file_name.lower().endswith(".png") and zip_png:
                 new_path = allocate_conversion_method(
                     conversion_method,
                     "png",
                     file_path,
-                    PILLOW_QUALITY,
-                    PILLOW_SUBSAMPLING,
+                    pillow_quality,
+                    pillow_subsampling,
                 )
                 new_size = os.path.getsize(new_path)
                 print_output(
                     original_size, new_size, "PNG→JPG", os.path.basename(new_path)
                 )
 
+            else:
+                print_output(original_size, original_size, "  SKP  ", file_name)
+
 
 # 转存功能：根据 conversion_method、file_type 选取转存方法
 def allocate_conversion_method(
-    conversion_method, file_type, file_path, PILLOW_QUALITY, PILLOW_SUBSAMPLING
+    conversion_method, file_type, file_path, pillow_quality, pillow_subsampling
 ):
-    # 用pillow压缩jpg
-    def jpg_pillow(file_path):
+    # 用pillow转换jpg
+    def pillow_jpg(file_path):
         new_path = os.path.splitext(file_path)[0] + "_dwnsiz.jpg"
         with Image.open(file_path) as img:
             img.save(
                 new_path,
                 format="JPEG",
-                quality=PILLOW_QUALITY,
-                subsampling=PILLOW_SUBSAMPLING,
+                quality=pillow_quality,
+                subsampling=pillow_subsampling,
                 optimize=True,
                 progressive=True,
             )
         os.remove(file_path)  # 删除原始文件
         return new_path
 
-    # 用pillow压缩png
-    def png_pillow(file_path):
+    # 用pillow转换png为jpg
+    def pillow_png(file_path):
         # 生成输出路径
-        output_dir = os.path.join(os.path.dirname(file_path), "pngToJpg")
+        output_dir = os.path.join(os.path.dirname(file_path), "pl_pngToJpg")
         os.makedirs(output_dir, exist_ok=True)
 
         # 生成目标文件名
@@ -112,8 +116,8 @@ def allocate_conversion_method(
             rgb_img.save(
                 jpg_path,
                 format="JPEG",
-                quality=PILLOW_QUALITY,
-                subsampling=PILLOW_SUBSAMPLING,
+                quality=pillow_quality,
+                subsampling=pillow_subsampling,
                 optimize=True,
                 progressive=True,
             )
@@ -121,13 +125,80 @@ def allocate_conversion_method(
         os.remove(file_path)  # 删除原始 PNG
         return jpg_path
 
+    # 用mspaint另存为jpg
+    def mspaint_jpg(file_path):
+        folder = os.path.dirname(file_path)
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        save_dir = os.path.join(folder, "ms_pngToJpg")
+        os.makedirs(save_dir, exist_ok=True)
+        new_file_name = f"{base_name}_dwnsiz.jpg"
+        new_path = os.path.join(save_dir, new_file_name)
+        jpg_seq = pillow_quality - 1
+
+        # 打开画图
+        subprocess.Popen(["mspaint.exe", file_path])
+        time.sleep(1.5)
+
+        # 打开“另存为”窗口
+        pyautogui.hotkey("f12")
+        time.sleep(1.5)
+
+        # 输入文件名
+        pyperclip.copy(new_file_name)
+        pyautogui.hotkey("ctrl", "v")
+        time.sleep(0.3)
+
+        # 打开文件类型下拉框
+        pyautogui.hotkey("alt", "t")
+        time.sleep(0.3)
+
+        # 选择JPEG类型
+        pyautogui.press("down", presses=1, interval=0.2)  # 呼出下拉栏
+        time.sleep(0.2)
+        pyautogui.press("up", presses=8, interval=0.1)  # 选到最上边
+        pyautogui.press("down", presses=jpg_seq, interval=0.1)  # jpg在从上到下第五个
+        pyautogui.press("enter")
+        time.sleep(0.3)
+
+        # 选取另存为的文件夹
+        pyperclip.copy(save_dir)
+        pyautogui.hotkey("ctrl", "l")  # 聚焦地址栏
+        time.sleep(0.3)
+        pyautogui.hotkey("ctrl", "v")  # 粘贴文件夹路径
+        time.sleep(0.2)
+        pyautogui.press("enter")
+        time.sleep(0.3)
+
+        # 保存组合键
+        pyautogui.hotkey("alt", "s")
+        time.sleep(0.3)
+        pyautogui.press("enter")  # 防止弹窗
+        time.sleep(1)
+
+        # 关闭画图
+        pyautogui.hotkey("alt", "f4")
+        time.sleep(0.5)
+
+        # 等待保存完成，最多 3 秒
+        for _ in range(6):
+            if os.path.exists(new_path):
+                # 删除原文件
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                return new_path
+            time.sleep(0.5)
+
+        raise FileNotFoundError(f"MSPaint 未成功保存文件: {new_path}")
+
     if conversion_method == METHOD_PILLOW and file_type == "jpg":
-        return jpg_pillow(file_path)
+        return pillow_jpg(file_path)
     elif conversion_method == METHOD_PILLOW and file_type == "png":
-        return png_pillow(file_path)
+        return pillow_png(file_path)
+    elif conversion_method == METHOD_MSPAINT:
+        return mspaint_jpg(file_path)
     else:
         raise ValueError(
-            f"allocate_conversion_method() 无法判定: conversion_method={conversion_method}, file_type={file_type}"
+            f"allocate_conversion_method() 无法判定: file_path={file_path}"
         )
 
 
@@ -168,13 +239,12 @@ def get_pillow_settings():
         entry_path.insert(0, folder)
 
     def confirm():
-        global ORIGINAL_FOLDER_PATH, ZIP_JPG, ZIP_PNG, VALID_SIZE, PILLOW_QUALITY, PILLOW_SUBSAMPLING
-        ORIGINAL_FOLDER_PATH = entry_path.get()
-        ZIP_JPG = var_jpg.get()
-        ZIP_PNG = var_png.get()
-        VALID_SIZE = int(entry_valid_size.get()) * 1024 * 1024
-        PILLOW_QUALITY = int(entry_quality.get())
-        PILLOW_SUBSAMPLING = int(entry_subsampling.get())
+        folder_path = entry_path.get()
+        zip_jpg = var_jpg.get()
+        zip_png = var_png.get()
+        valid_size = float(entry_valid_size.get()) * 1024 * 1024
+        pillow_quality = int(entry_quality.get())
+        pillow_subsampling = int(entry_subsampling.get())
 
         # GUI调用压缩Function
         confirm_delete = messagebox.askokcancel(
@@ -182,23 +252,15 @@ def get_pillow_settings():
         )
 
         if confirm_delete:
-            print(
-                f"ORIGINAL_FOLDER_PATH = {ORIGINAL_FOLDER_PATH}, "
-                + f"ZIP_JPG = {ZIP_JPG}, "
-                + f"ZIP_PNG = {ZIP_PNG}, "
-                + f"VALID_SIZE = {entry_valid_size}, "
-                + f"PILLOW_QUALITY = {PILLOW_QUALITY}, "
-                + f"PILLOW_SUBSAMPLING = {PILLOW_SUBSAMPLING}"
-            )
             root.destroy()
             start_conversion(
                 METHOD_PILLOW,
-                ORIGINAL_FOLDER_PATH,
-                ZIP_JPG,
-                ZIP_PNG,
-                VALID_SIZE,
-                PILLOW_QUALITY,
-                PILLOW_SUBSAMPLING,
+                folder_path,
+                zip_jpg,
+                zip_png,
+                valid_size,
+                pillow_quality,
+                pillow_subsampling,
             )
 
     root = tk.Tk()
@@ -247,21 +309,79 @@ def get_pillow_settings():
 
 
 # GUI页面：MSPaint转存
-def jpg_use_mspaint(file_path):
-    # 打开画图
-    subprocess.Popen(["mspaint.exe", file_path])
-    time.sleep(1.5)  # 等待画图启动
+def get_mspaint_settings():
+    def browse_folder():
+        folder = filedialog.askdirectory(title="选择图片文件夹")
+        entry_path.delete(0, tk.END)
+        entry_path.insert(0, folder)
 
-    # 模拟按键 Ctrl+S 保存
-    pyautogui.hotkey("ctrl", "s")
-    time.sleep(0.5)
+    def confirm():
+        folder_path = entry_path.get()
+        zip_jpg = var_jpg.get()
+        zip_png = var_png.get()
+        valid_size = float(entry_valid_size.get()) * 1024 * 1024
+        jpg_seq = int(entry_jpg_seq.get())
 
-    # 关闭画图
-    pyautogui.hotkey("alt", "f4")
-    time.sleep(0.5)
+        # GUI调用压缩Function
+        confirm_delete = messagebox.askokcancel(
+            "确认操作", "开始处理后将删除原始图片文件。\n是否继续？", icon="warning"
+        )
+
+        if confirm_delete:
+            root.destroy()
+            start_conversion(
+                METHOD_MSPAINT,
+                folder_path,
+                zip_jpg,
+                zip_png,
+                valid_size,
+                jpg_seq,
+                0,
+            )
+
+    root = tk.Tk()
+    root.title("图片压缩设置")
+    root.geometry("760x300")
+
+    # 文件夹路径
+    tk.Label(root, text="文件夹路径:").grid(row=0, column=0, sticky="e", pady=5)
+    entry_path = tk.Entry(root, width=40)
+    entry_path.grid(row=0, column=1, padx=5)
+    tk.Button(root, text="浏览...", command=browse_folder).grid(row=0, column=2, padx=5)
+
+    # 勾选框
+    var_jpg = tk.BooleanVar(value=False)
+    var_png = tk.BooleanVar(value=True)
+    tk.Checkbutton(root, text="转存 JPG", variable=var_jpg).grid(
+        row=1, column=1, sticky="w"
+    )
+    tk.Checkbutton(root, text="转存 PNG→JPG", variable=var_png).grid(
+        row=2, column=1, sticky="w"
+    )
+
+    # 数值输入
+    tk.Label(root, text="最小有效大小 (MB):").grid(row=3, column=0, sticky="e", pady=5)
+    entry_valid_size = tk.Entry(root, width=10)
+    entry_valid_size.insert(0, "0.1")
+    entry_valid_size.grid(row=3, column=1, sticky="w")
+
+    tk.Label(root, text="另存为选择文件类型时\njpg是第几个选项：").grid(
+        row=4, column=0, sticky="e", pady=5
+    )
+    entry_jpg_seq = tk.Entry(root, width=10)
+    entry_jpg_seq.insert(0, "5")
+    entry_jpg_seq.grid(row=4, column=1, sticky="w")
+
+    tk.Button(
+        root, text="确认并开始", command=confirm, width=20, bg="#4CAF50", fg="white"
+    ).grid(row=6, column=1, pady=20)
+
+    root.mainloop()
 
 
 # 调用 GUI 获取输入
 get_method_gui()
 if CHOOSE_METHOD == METHOD_PILLOW:
     get_pillow_settings()
+elif CHOOSE_METHOD == METHOD_MSPAINT:
+    get_mspaint_settings()
