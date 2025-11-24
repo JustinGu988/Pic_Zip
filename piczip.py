@@ -192,55 +192,23 @@ def allocate_conversion_method(
 
     # 用mspaint保存jpg
     def mspaint_jpg(file_path):
-        folder = os.path.dirname(file_path)
-        base_name = os.path.splitext(os.path.basename(file_path))[0]
-        save_dir = os.path.join(folder, "ms_jpgToJpg")
-        os.makedirs(save_dir, exist_ok=True)
-        new_file_name = f"{base_name}_dwnsiz.jpg"
-        new_path = os.path.join(save_dir, new_file_name)
-
         # 打开画图
         subprocess.Popen(["mspaint.exe", file_path])
         time.sleep(1.5)
 
-        # 打开“另存为”窗口
-        pyautogui.hotkey("f12")
-        time.sleep(1.5)
-
-        # 输入文件名
-        pyperclip.copy(new_file_name)
-        pyautogui.hotkey("ctrl", "v")
-        time.sleep(0.3)
-
-        # 选取另存为的文件夹
-        pyperclip.copy(save_dir)
-        pyautogui.hotkey("ctrl", "l")  # 聚焦地址栏
-        time.sleep(0.3)
-        pyautogui.hotkey("ctrl", "v")  # 粘贴文件夹路径
-        time.sleep(0.2)
-        pyautogui.press("enter")
-        time.sleep(0.3)
-
-        # 保存组合键
-        pyautogui.hotkey("alt", "s")
-        time.sleep(0.3)
-        pyautogui.press("enter")  # 防止弹窗
+        # 执行“保存”覆盖原图
+        pyautogui.hotkey("ctrl", "s")
         time.sleep(1)
 
         # 关闭画图
         pyautogui.hotkey("alt", "f4")
         time.sleep(0.5)
 
-        # 等待保存完成，最多 3 秒
-        for _ in range(6):
-            if os.path.exists(new_path):
-                # 删除原文件
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                return new_path
-            time.sleep(0.5)
+        # 确保文件依旧存在（简单检查）
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"保存失败：文件不存在 {file_path}")
 
-        raise FileNotFoundError(f"MSPaint 未成功保存文件: {new_path}")
+        return file_path
 
     if conversion_method == METHOD_PILLOW and file_type == "jpg":
         return pillow_jpg(file_path)
