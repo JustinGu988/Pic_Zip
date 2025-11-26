@@ -87,7 +87,7 @@ def allocate_conversion_method(
 ):
     # 用pillow转换jpg
     def pillow_jpg(file_path):
-        new_path = os.path.splitext(file_path)[0] + "_dwnsiz.jpg"
+        new_path = os.path.splitext(file_path)[0] + "_plJ2J.jpg"
         with Image.open(file_path) as img:
             img.save(
                 new_path,
@@ -108,7 +108,7 @@ def allocate_conversion_method(
 
         # 生成目标文件名
         jpg_path = os.path.join(
-            output_dir, os.path.splitext(os.path.basename(file_path))[0] + "_dwnsiz.jpg"
+            output_dir, os.path.splitext(os.path.basename(file_path))[0] + "_plP2J.jpg"
         )
 
         with Image.open(file_path) as img:
@@ -131,7 +131,7 @@ def allocate_conversion_method(
         base_name = os.path.splitext(os.path.basename(file_path))[0]
         save_dir = os.path.join(folder, "ms_pngToJpg")
         os.makedirs(save_dir, exist_ok=True)
-        new_file_name = f"{base_name}_dwnsiz.jpg"
+        new_file_name = f"{base_name}_msP2J.jpg"
         new_path = os.path.join(save_dir, new_file_name)
         jpg_seq = pillow_quality - 1
 
