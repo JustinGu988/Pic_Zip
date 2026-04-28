@@ -37,7 +37,7 @@ def start_conversion(
         else:
             ratio = (new_size - original_size) / original_size * 100
 
-        ratio_display = f"{'++++++' if ratio >= 0 and original_size != 0 else f'{ratio:>6.1f}'}"  # 宽度6，1位小数
+        ratio_display = f"{'++++++' if ratio > 0 and original_size != 0 else f'{ratio:>6.1f}'}"  # 宽度6，1位小数
 
         # 格式化输出
         # {value:>W.Pf} 含义:
@@ -68,13 +68,16 @@ def start_conversion(
         original_size = os.path.getsize(file_path)
 
         # 设定文件类型（避免选取文件夹）
-        valid_pic_file = file_name.lower().endswith((".jpg", ".png"))
+        valid_pic_file = file_name.lower().endswith((".jpg", ".png", "jfif"))
         valid_jpg = file_name.lower().endswith(".jpg")
         valid_png = file_name.lower().endswith(".png")
 
         # 1. 判断文件大小
         # 2. 判断文件类型
-        if valid_pic_file and original_size <= valid_size:
+        if not valid_pic_file:
+            continue
+
+        elif valid_pic_file and original_size <= valid_size:
             print_output(original_size, original_size, "  <MB  ", file_name)
 
         elif valid_jpg and zip_jpg and original_size > valid_size:
@@ -91,7 +94,7 @@ def start_conversion(
             new_size = os.path.getsize(new_path)
             print_output(original_size, new_size, "PNG→JPG", os.path.basename(new_path))
 
-        else:  # invalid file type
+        else:
             print_output(original_size, original_size, "FIL INV", file_name)
 
 
