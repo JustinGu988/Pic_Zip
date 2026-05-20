@@ -7,6 +7,8 @@ from PIL import Image
 
 METHOD_PILLOW = "P"
 METHOD_MSPAINT = "M"
+TYPE_JPG = "jpg"
+TYPE_PNG = "png"
 
 # 转存分为以下步骤：
 # start_conversion
@@ -25,7 +27,8 @@ def start_conversion(
     folder_path,
     zip_jpg,
     zip_png,
-    valid_size,
+    valid_size_min,
+    valid_size_max,
     var_1,  # for pillow: pillow_quality; for png: jpg_list_press_up
     var_2,  # for pillow: pillow_subsampling; for png: jpg_list_press_dw
 ):
@@ -61,35 +64,50 @@ def start_conversion(
         print(f"目录不存在: {folder_path}")
         return
 
-    print(f"开始遍历文件夹中的图片: {folder_path}\n")
+    print(f"开始遍历文件夹中的图片: {folder_path}")
+    print(
+        f"conversion_method: {conversion_method};",
+        f"zip_jpg: {zip_jpg};",
+        f"zip_png: {zip_png};",
+        f"valid_size_min: {valid_size_min/1024/1024};",
+        f"valid_size_max: {valid_size_max/1024/1024};",
+        f"var_1: {var_1};",
+        f"var_2: {var_2}\n",
+    )
 
     for file_name in os.listdir(folder_path):
         file_path = os.path.join(folder_path, file_name)
         original_size = os.path.getsize(file_path)
 
-        # 设定文件类型（避免选取文件夹）
+        # 设定文件类型判定（避免选取文件夹）
         valid_pic_file = file_name.lower().endswith((".jpg", ".png", "jfif"))
         valid_jpg = file_name.lower().endswith(".jpg")
         valid_png = file_name.lower().endswith(".png")
+        valid_size = valid_size_min <= original_size <= valid_size_max
 
-        # 1. 判断文件大小
-        # 2. 判断文件类型
-        if not valid_pic_file:
+        # 判断大小、类型
+        if any(
+            [
+                not valid_pic_file,
+                valid_jpg and not zip_jpg,
+                valid_png and not zip_png,
+            ]
+        ):
             continue
 
-        elif valid_pic_file and original_size <= valid_size:
+        elif valid_pic_file and not valid_size:
             print_output(original_size, original_size, "  <MB  ", file_name)
 
-        elif valid_jpg and zip_jpg and original_size > valid_size:
+        elif valid_jpg and zip_jpg and valid_size:
             new_path = allocate_conversion_method(
-                conversion_method, "jpg", file_path, var_1, var_2
+                conversion_method, TYPE_JPG, file_path, var_1, var_2
             )
             new_size = os.path.getsize(new_path)
             print_output(original_size, new_size, "  JPG  ", os.path.basename(new_path))
 
-        elif valid_png and zip_png and original_size > valid_size:
+        elif valid_png and zip_png and valid_size:
             new_path = allocate_conversion_method(
-                conversion_method, "png", file_path, var_1, var_2
+                conversion_method, TYPE_PNG, file_path, var_1, var_2
             )
             new_size = os.path.getsize(new_path)
             print_output(original_size, new_size, "PNG→JPG", os.path.basename(new_path))
@@ -157,7 +175,7 @@ def allocate_conversion_method(conversion_method, file_type, file_path, var_1, v
 
         # 打开“另存为”窗口
         pyautogui.hotkey("f12")
-        time.sleep(2)
+        time.sleep(1.5)
 
         # 输入文件名
         pyperclip.copy(new_file_name)
@@ -170,7 +188,7 @@ def allocate_conversion_method(conversion_method, file_type, file_path, var_1, v
 
         # 选择JPEG类型
         pyautogui.press("down", presses=1, interval=0.3)  # 呼出下拉栏
-        time.sleep(0.5)
+        time.sleep(0.3)
         pyautogui.press(
             "up", presses=list_press_up, interval=0.3
         )  # 在下拉栏中向上选list_press_up个
@@ -230,13 +248,13 @@ def allocate_conversion_method(conversion_method, file_type, file_path, var_1, v
 
         return file_path
 
-    if conversion_method == METHOD_PILLOW and file_type == "jpg":
+    if conversion_method == METHOD_PILLOW and file_type == TYPE_JPG:
         return pillow_jpg(file_path)
-    elif conversion_method == METHOD_PILLOW and file_type == "png":
+    elif conversion_method == METHOD_PILLOW and file_type == TYPE_PNG:
         return pillow_png(file_path)
-    elif conversion_method == METHOD_MSPAINT and file_type == "jpg":
+    elif conversion_method == METHOD_MSPAINT and file_type == TYPE_JPG:
         return mspaint_jpg(file_path)
-    elif conversion_method == METHOD_MSPAINT:
+    elif conversion_method == METHOD_MSPAINT and file_type == TYPE_PNG:
         return mspaint_png(file_path)
     else:
         raise ValueError(

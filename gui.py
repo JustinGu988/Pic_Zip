@@ -53,7 +53,8 @@ def get_pillow_settings():
         folder_path = entry_path.get()
         zip_jpg = var_jpg.get()
         zip_png = var_png.get()
-        valid_size = float(entry_valid_size.get()) * 1024 * 1024
+        valid_size_min = float(entry_valid_size_min.get()) * 1024 * 1024
+        valid_size_max = float(entry_valid_size_max.get()) * 1024 * 1024
         pillow_quality = int(entry_quality.get())
         pillow_subsampling = int(entry_subsampling.get())
 
@@ -69,7 +70,8 @@ def get_pillow_settings():
                 folder_path,
                 zip_jpg,
                 zip_png,
-                valid_size,
+                valid_size_min,
+                valid_size_max,
                 pillow_quality,
                 pillow_subsampling,
             )
@@ -81,8 +83,8 @@ def get_pillow_settings():
     # 文件夹路径
     tk.Label(root, text="文件夹路径:").grid(row=0, column=0, sticky="e", pady=5)
     entry_path = tk.Entry(root, width=40)
-    entry_path.grid(row=0, column=1, padx=5)
-    tk.Button(root, text="浏览...", command=browse_folder).grid(row=0, column=2, padx=5)
+    entry_path.grid(row=0, column=1, columnspan=3, sticky="w", padx=5)
+    tk.Button(root, text="浏览...", command=browse_folder).grid(row=0, column=4, padx=5)
 
     # 勾选框
     var_jpg = tk.BooleanVar(value=False)
@@ -95,22 +97,27 @@ def get_pillow_settings():
     )
 
     # 数值输入
-    tk.Label(root, text="最小有效大小 (MB):").grid(row=3, column=0, sticky="e", pady=5)
-    entry_valid_size = tk.Entry(root, width=10)
-    entry_valid_size.insert(0, "0.1")
-    entry_valid_size.grid(row=3, column=1, sticky="w")
+    tk.Label(root, text="大小范围 (MB):").grid(row=3, column=0, sticky="e", pady=5)
+    entry_valid_size_min = tk.Entry(root, width=10)
+    entry_valid_size_min.insert(0, "0.1")
+    entry_valid_size_min.grid(row=3, column=1, sticky="w", padx=5)
+
+    tk.Label(root, text="to ").grid(row=3, column=2)
+    entry_valid_size_max = tk.Entry(root, width=10)
+    entry_valid_size_max.insert(0, "20")
+    entry_valid_size_max.grid(row=3, column=3, sticky="w")
 
     tk.Label(root, text="JPEG 质量 (0-100):").grid(row=4, column=0, sticky="e", pady=5)
     entry_quality = tk.Entry(root, width=10)
     entry_quality.insert(0, "95")
-    entry_quality.grid(row=4, column=1, sticky="w")
+    entry_quality.grid(row=4, column=1, sticky="w", padx=5)
 
     tk.Label(root, text="色度抽样 (0=4:4:4, 1=4:2:2, 2=4:2:0):").grid(
         row=5, column=0, sticky="e", pady=5
     )
     entry_subsampling = tk.Entry(root, width=10)
     entry_subsampling.insert(0, "0")
-    entry_subsampling.grid(row=5, column=1, sticky="w")
+    entry_subsampling.grid(row=5, column=1, sticky="w", padx=5)
 
     tk.Button(
         root, text="确认并开始", command=confirm, width=20, bg="#4CAF50", fg="white"
@@ -130,7 +137,8 @@ def get_mspaint_settings():
         folder_path = entry_path.get()
         zip_jpg = var_jpg.get()
         zip_png = var_png.get()
-        valid_size = float(entry_valid_size.get()) * 1024 * 1024
+        valid_size_min = float(entry_valid_size_min.get()) * 1024 * 1024
+        valid_size_max = float(entry_valid_size_max.get()) * 1024 * 1024
         list_press_up = int(entry_jpg_press_up.get())
         list_press_dw = int(entry_jpg_press_dw.get())
 
@@ -146,7 +154,8 @@ def get_mspaint_settings():
                 folder_path,
                 zip_jpg,
                 zip_png,
-                valid_size,
+                valid_size_min,
+                valid_size_max,
                 list_press_up,
                 list_press_dw,
             )
@@ -158,13 +167,13 @@ def get_mspaint_settings():
     # 文件夹路径
     tk.Label(root, text="文件夹路径:").grid(row=0, column=0, sticky="e", pady=5)
     entry_path = tk.Entry(root, width=40)
-    entry_path.grid(row=0, column=1, padx=5)
-    tk.Button(root, text="浏览...", command=browse_folder).grid(row=0, column=2, padx=5)
+    entry_path.grid(row=0, column=1, columnspan=3, sticky="w", padx=5)
+    tk.Button(root, text="浏览...", command=browse_folder).grid(row=0, column=4, padx=5)
 
     # 勾选框
     var_jpg = tk.BooleanVar(value=False)
     var_png = tk.BooleanVar(value=False)
-    tk.Checkbutton(root, text="转存 JPG", variable=var_jpg).grid(
+    tk.Checkbutton(root, text="压缩 JPG", variable=var_jpg).grid(
         row=1, column=1, sticky="w"
     )
     tk.Checkbutton(root, text="转存 PNG→JPG", variable=var_png).grid(
@@ -172,20 +181,25 @@ def get_mspaint_settings():
     )
 
     # 数值输入
-    tk.Label(root, text="最小有效大小 (MB):").grid(row=3, column=0, sticky="e", pady=5)
-    entry_valid_size = tk.Entry(root, width=10)
-    entry_valid_size.insert(0, "0.1")
-    entry_valid_size.grid(row=3, column=1, sticky="w")
+    tk.Label(root, text="大小范围 (MB):").grid(row=3, column=0, sticky="e", pady=5)
+    entry_valid_size_min = tk.Entry(root, width=10)
+    entry_valid_size_min.insert(0, "0.1")
+    entry_valid_size_min.grid(row=3, column=1, sticky="w", padx=5)
+
+    tk.Label(root, text="to ").grid(row=3, column=2)
+    entry_valid_size_max = tk.Entry(root, width=10)
+    entry_valid_size_max.insert(0, "20")
+    entry_valid_size_max.grid(row=3, column=3, sticky="w")
 
     tk.Label(root, text="下拉单上移次数:").grid(row=4, column=0, sticky="e", pady=5)
     entry_jpg_press_up = tk.Entry(root, width=10)
     entry_jpg_press_up.insert(0, "3")
-    entry_jpg_press_up.grid(row=4, column=1, sticky="w")
+    entry_jpg_press_up.grid(row=4, column=1, sticky="w", padx=5)
 
     tk.Label(root, text="下拉单下移次数:").grid(row=5, column=0, sticky="e", pady=5)
     entry_jpg_press_dw = tk.Entry(root, width=10)
     entry_jpg_press_dw.insert(0, "0")
-    entry_jpg_press_dw.grid(row=5, column=1, sticky="w")
+    entry_jpg_press_dw.grid(row=5, column=1, sticky="w", padx=5)
 
     tk.Button(
         root, text="确认并开始", command=confirm, width=20, bg="#4CAF50", fg="white"
