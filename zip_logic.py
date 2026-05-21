@@ -4,11 +4,35 @@ import subprocess
 import pyautogui  # pip install pyautogui
 import pyperclip  # pip install pyperclip
 from PIL import Image
+from datetime import datetime
 
 METHOD_PILLOW = "P"
 METHOD_MSPAINT = "M"
 TYPE_JPG = "jpg"
 TYPE_PNG = "png"
+
+
+# 定义并实例化全局拦截器，用于拦截print内容
+class OutputInterceptor:
+    def __init__(self):
+        self.output = []
+        # 打开 output_log.txt，'a' 模式表示追加写入（文件不存在会自动创建）
+        # encoding='utf-8' 确保中文不会乱码
+        self.log_file = open("output_log.txt", "a", encoding="utf-8")
+
+    def write(self, text):
+        if text.strip():
+            self.output.append(text)
+            # 将内容同时写入到本地的 txt 文件中
+            self.log_file.write(text + "\n")
+            self.log_file.flush()
+
+    def flush(self):
+        if not self.log_file.closed:
+            self.log_file.close()
+
+
+interceptor = OutputInterceptor()
 
 # 转存分为以下步骤：
 # start_conversion
@@ -33,6 +57,11 @@ def start_conversion(
     var_2,  # for pillow: pillow_subsampling; for png: jpg_list_press_dw
 ):
 
+    # 将print指向拦截器
+    import sys
+
+    sys.stdout = interceptor
+
     # 控制台输出size变化
     def print_output(original_size, new_size, convert_type, file_name):
         if original_size == 0:
@@ -51,20 +80,23 @@ def start_conversion(
         # 示例：
         # 23.45 MB →  50.00 MB (+146.9%): filename1
         #  1.20 MB →   0.50 MB (+140.0%): filename2
-        print(
+        log_text = (
             f"{convert_type:^7} "
             f"{original_size/1024/1024:>5.2f} MB →"  # 宽度5，2位小数
             f"{new_size/1024/1024:>6.2f} MB ("  # 宽度5，2位小数
             f"{ratio_display}%): "
             f"{file_name}"
         )
+        # 输出到拦截器
+        print(log_text, end="")
 
     # 确保路径存在
     if not os.path.isdir(folder_path):
         print(f"目录不存在: {folder_path}")
         return
 
-    print(f"开始遍历文件夹中的图片: {folder_path}")
+    current_time = datetime.now().strftime("%H:%M:%S")
+    print(f"\n{current_time}", f"开始遍历文件夹中的图片: {folder_path}")
     print(
         f"conversion_method: {conversion_method};",
         f"zip_jpg: {zip_jpg};",
@@ -72,7 +104,7 @@ def start_conversion(
         f"valid_size_min: {valid_size_min/1024/1024};",
         f"valid_size_max: {valid_size_max/1024/1024};",
         f"var_1: {var_1};",
-        f"var_2: {var_2}\n",
+        f"var_2: {var_2}",
     )
 
     for file_name in os.listdir(folder_path):

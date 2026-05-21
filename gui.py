@@ -75,6 +75,11 @@ def get_pillow_settings():
                 pillow_quality,
                 pillow_subsampling,
             )
+            # 输出结果
+            from zip_logic import interceptor
+
+            logs = "\n".join(interceptor.output)
+            gui_show_result(logs)
 
     root = tk.Tk()
     root.title("图片压缩设置")
@@ -159,6 +164,11 @@ def get_mspaint_settings():
                 list_press_up,
                 list_press_dw,
             )
+            # 输出结果
+            from zip_logic import interceptor
+
+            logs = "\n".join(interceptor.output)
+            gui_show_result(logs)
 
     root = tk.Tk()
     root.title("图片压缩设置")
@@ -206,3 +216,23 @@ def get_mspaint_settings():
     ).grid(row=6, column=1, pady=20)
 
     root.mainloop()
+
+
+# GUI页面：结果展示窗
+def gui_show_result(logs_text):
+    result_window = tk.Tk()
+    result_window.title("压缩执行结果")
+    result_window.geometry("1400x600")
+
+    # 创建一个带滚动条的文本框
+    text_area = tk.Text(result_window, wrap="word", font=("Consolas", 10))
+    scrollbar = tk.Scrollbar(result_window, command=text_area.yview)
+    text_area.config(yscrollcommand=scrollbar.set)
+
+    scrollbar.pack(side="right", fill="y")
+    text_area.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+
+    text_area.insert("1.0", logs_text)
+    text_area.config(state="disabled")
+
+    result_window.mainloop()
