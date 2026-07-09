@@ -1,238 +1,328 @@
+import ctypes
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
 from zip_logic import start_conversion, METHOD_MSPAINT, METHOD_PILLOW
 
-# 文件包含三个GUI页面
-#   - 首页：选取转存方式
-#   - Pillow页面
-#   - MSPaint页面
+# 结构：
+# App (tk.Tk)  <-- 创建和切换页面
+#  │
+#  ├── MethodPage (tk.Frame)  <-- 选取方式页面
+#  │
+#  ├── BaseSettingsPage (tk.Frame)  <-- 公共
+#  │     │
+#  │     ├── PillowSettingsPage  <-- 继承，扩展特有参数
+#  │     └── MsSettingsPage      <-- 继承，扩展特有参数
+#  │
+#  └── ResultPage (tk.Frame)  <-- 结果页面
 
 
-# GUI页面：选取转存方式
-def get_method_gui():
-    def confirm_choice():
-        selected_value = var_choice.get()
-        root.destroy()
+class App(tk.Tk):
+    # 主程序控制器，继承自tk.Tk
+    def __init__(self):
+        # 开启DPI感知，解决2K/4K屏幕显示问题
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except Exception:
+            pass  # 如果不是Windows系统，忽略
 
-    root = tk.Tk()
-    root.title("选择转存方式")
-    root.geometry("300x180")
+        super().__init__()
+        self.title("图片处理工具")
+        self.resizable(True, True)
 
-    # Default value
-    var_choice = tk.StringVar(value="pillow")
+        # 用于存储页面的容器
+        self._frames = {}
 
-    tk.Label(root, text="选择图片转存方式：", font=("Microsoft YaHei", 11)).pack(
-        pady=15
-    )
-    tk.Radiobutton(root, text="Pillow", variable=var_choice, value=METHOD_PILLOW).pack(
-        anchor="w", padx=60
-    )
-    tk.Radiobutton(
-        root, text="MSPaint", variable=var_choice, value=METHOD_MSPAINT
-    ).pack(anchor="w", padx=60)
-    tk.Button(
-        root, text="确认", command=confirm_choice, bg="#4CAF50", fg="white", width=10
-    ).pack(pady=15)
+        # 初始化页面并放入容器
+        for F in (MethodPage, PillowSettingsPage, MsSettingsPage, ResultPage):
+            page_name = F.__name__
+            frame = F(parent=self, controller=self)
+            self._frames[page_name] = frame
+            # 将所有页面叠放在同一位置
+            frame.grid(row=0, column=0, sticky="nsew")
 
-    # 启动事件循环，程序会在这里暂停，直到 root.destroy() 被调用
-    root.mainloop()
+        # 默认显示第一个页面
+        self.show_frame("MethodPage")
 
-    # 窗口关闭后，返回选择（pillow or mspaint）
-    return var_choice.get()
+    # 让窗口根据内部控件自适应大小，并居中显示在屏幕正中央
+    def center_window(self):
+        self.update_idletasks()  # 强制刷新，让 Tkinter 算出真实的宽高
+        w = self.winfo_width()  # 获取窗口实际宽度
+        h = self.winfo_height()  # 获取窗口实际高度
+
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+
+        x = (screen_w // 2) - (w // 2)
+        y = (screen_h // 2) - (h // 2)
+
+        # 只设置位置，不设置固定大小
+        self.geometry(f"+{x}+{y}")
+
+    # 切换到指定页面
+    def show_frame(self, page_name):
+        frame = self._frames[page_name]
+        frame.tkraise()  # 将目标页面提升到最前面
+        self.center_window()  # 每次切换页面重新居中
+
+    def show_result(self, logs_text):
+        self.show_frame("ResultPage")
+        self._frames["ResultPage"].show_logs(logs_text)
 
 
-# GUI页面：Pillow转存
-def get_pillow_settings():
-    def browse_folder():
+class MethodPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+
+        tk.Label(self, text="选择图片转存方式：", font=("Microsoft YaHei", 11)).pack(
+            pady=15
+        )
+
+        self.var_choice = tk.StringVar(value=METHOD_PILLOW)
+        tk.Radiobutton(
+            self, text="Pillow", variable=self.var_choice, value=METHOD_PILLOW
+        ).pack(anchor="w", padx=60)
+        tk.Radiobutton(
+            self, text="MSPaint", variable=self.var_choice, value=METHOD_MSPAINT
+        ).pack(anchor="w", padx=60)
+
+        tk.Button(
+            self,
+            text="确认",
+            command=self.confirm_choice,
+            bg="#4CAF50",
+            fg="white",
+            width=10,
+        ).pack(pady=15)
+
+    def confirm_choice(self):
+        selected = self.var_choice.get()
+        if selected == METHOD_PILLOW:
+            self.controller.show_frame("PillowSettingsPage")
+        elif selected == METHOD_MSPAINT:
+            self.controller.show_frame("MsSettingsPage")
+        else:
+            messagebox.showinfo("提示", "Method Selection错误")
+
+
+class BaseSettingsPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+
+        # 文件夹路径
+        tk.Label(self, text="文件夹路径:").grid(row=0, column=0, sticky="e", pady=5)
+        self.entry_path = tk.Entry(self, width=40)
+        self.entry_path.grid(row=0, column=1, columnspan=3, sticky="w", padx=5)
+        tk.Button(self, text="浏览...", command=self.browse_folder).grid(
+            row=0, column=4, padx=5
+        )
+
+        # 勾选框
+        self.var_jpg = tk.BooleanVar(value=False)
+        self.var_png = tk.BooleanVar(value=False)
+        tk.Checkbutton(self, text="压缩 JPG", variable=self.var_jpg).grid(
+            row=1, column=1, sticky="w"
+        )
+        tk.Checkbutton(self, text="转存 PNG→JPG", variable=self.var_png).grid(
+            row=2, column=1, sticky="w"
+        )
+
+        # 大小范围
+        tk.Label(self, text="大小范围 (MB):").grid(row=3, column=0, sticky="e", pady=5)
+        self.entry_valid_size_min = tk.Entry(self, width=10)
+        self.entry_valid_size_min.insert(0, "0.1")
+        self.entry_valid_size_min.grid(row=3, column=1, sticky="w", padx=5)
+        tk.Label(self, text="to ").grid(row=3, column=2)
+        self.entry_valid_size_max = tk.Entry(self, width=10)
+        self.entry_valid_size_max.insert(0, "20")
+        self.entry_valid_size_max.grid(row=3, column=3, sticky="w")
+
+    def browse_folder(self):
         folder = filedialog.askdirectory(title="选择图片文件夹")
-        entry_path.delete(0, tk.END)
-        entry_path.insert(0, folder)
+        self.entry_path.delete(0, tk.END)
+        self.entry_path.insert(0, folder)
 
-    def confirm():
-        folder_path = entry_path.get()
-        zip_jpg = var_jpg.get()
-        zip_png = var_png.get()
-        valid_size_min = float(entry_valid_size_min.get()) * 1024 * 1024
-        valid_size_max = float(entry_valid_size_max.get()) * 1024 * 1024
-        pillow_quality = int(entry_quality.get())
-        pillow_subsampling = int(entry_subsampling.get())
 
-        # GUI调用压缩Function
+class PillowSettingsPage(BaseSettingsPage):
+    # GUI结构：
+    # grid()
+    # ├─ 第0~3行：[继承自 BaseSettingsPage 的公共控件]
+    # │    ├─ 第0行：Label("文件夹路径:")...
+    # │    ├─ 第1行：Checkbutton("压缩 JPG")
+    # │    ├─ 第2行：Checkbutton("转存 PNG→JPG")
+    # │    └─ 第3行：Label("大小范围 (MB):")...
+    # ├─ 第4行：Label("JPEG 质量")...
+    # ├─ 第5行：Label("色度抽样")...
+    # └─ 第6行：btn_frame (tk.Frame) [columnspan=5, 跨越所有列]
+    #     pack()
+    #     ├─ 左侧：Button("返回")
+    #     └─ 左侧：Button("确认并开始")
+    def __init__(self, parent, controller):
+        super().__init__(parent, controller)
+
+        # Pillow 特有参数
+        tk.Label(self, text="JPEG 质量 (0-100):").grid(
+            row=4, column=0, sticky="e", pady=5
+        )
+        self.entry_quality = tk.Entry(self, width=10)
+        self.entry_quality.insert(0, "97")
+        self.entry_quality.grid(row=4, column=1, sticky="w", padx=5)
+
+        tk.Label(self, text="色度抽样 (0=4:4:4, 1=4:2:2, 2=4:2:0):").grid(
+            row=5, column=0, sticky="e", pady=5
+        )
+        self.entry_subsampling = tk.Entry(self, width=10)
+        self.entry_subsampling.insert(0, "0")
+        self.entry_subsampling.grid(row=5, column=1, sticky="w", padx=5)
+
+        # 按钮区域
+        btn_frame = tk.Frame(self)
+        btn_frame.grid(row=6, column=0, columnspan=5, pady=20)
+        tk.Button(
+            btn_frame,
+            text="返回",
+            command=lambda: controller.show_frame("MethodPage"),
+            width=10,
+        ).pack(side="left", padx=10)
+        tk.Button(
+            btn_frame,
+            text="确认并开始",
+            command=self.confirm,
+            width=20,
+            bg="#4CAF50",
+            fg="white",
+        ).pack(side="left", padx=10)
+
+    def confirm(self):
+        # 收集参数并调用逻辑
         confirm_delete = messagebox.askokcancel(
             "确认操作", "开始处理后将删除原始图片文件。\n是否继续？", icon="warning"
         )
-
         if confirm_delete:
-            root.destroy()
             start_conversion(
                 METHOD_PILLOW,
-                folder_path,
-                zip_jpg,
-                zip_png,
-                valid_size_min,
-                valid_size_max,
-                pillow_quality,
-                pillow_subsampling,
+                self.entry_path.get(),
+                self.var_jpg.get(),
+                self.var_png.get(),
+                float(self.entry_valid_size_min.get()) * 1024 * 1024,
+                float(self.entry_valid_size_max.get()) * 1024 * 1024,
+                int(self.entry_quality.get()),
+                int(self.entry_subsampling.get()),
             )
-            # 输出结果
             from zip_logic import interceptor
 
             logs = "\n".join(interceptor.output)
-            gui_show_result(logs)
-
-    root = tk.Tk()
-    root.title("图片压缩设置")
-    root.geometry("840x320")
-
-    # 文件夹路径
-    tk.Label(root, text="文件夹路径:").grid(row=0, column=0, sticky="e", pady=5)
-    entry_path = tk.Entry(root, width=40)
-    entry_path.grid(row=0, column=1, columnspan=3, sticky="w", padx=5)
-    tk.Button(root, text="浏览...", command=browse_folder).grid(row=0, column=4, padx=5)
-
-    # 勾选框
-    var_jpg = tk.BooleanVar(value=False)
-    var_png = tk.BooleanVar(value=False)
-    tk.Checkbutton(root, text="压缩 JPG", variable=var_jpg).grid(
-        row=1, column=1, sticky="w"
-    )
-    tk.Checkbutton(root, text="转存 PNG→JPG", variable=var_png).grid(
-        row=2, column=1, sticky="w"
-    )
-
-    # 数值输入
-    tk.Label(root, text="大小范围 (MB):").grid(row=3, column=0, sticky="e", pady=5)
-    entry_valid_size_min = tk.Entry(root, width=10)
-    entry_valid_size_min.insert(0, "0.1")
-    entry_valid_size_min.grid(row=3, column=1, sticky="w", padx=5)
-
-    tk.Label(root, text="to ").grid(row=3, column=2)
-    entry_valid_size_max = tk.Entry(root, width=10)
-    entry_valid_size_max.insert(0, "20")
-    entry_valid_size_max.grid(row=3, column=3, sticky="w")
-
-    tk.Label(root, text="JPEG 质量 (0-100):").grid(row=4, column=0, sticky="e", pady=5)
-    entry_quality = tk.Entry(root, width=10)
-    entry_quality.insert(0, "95")
-    entry_quality.grid(row=4, column=1, sticky="w", padx=5)
-
-    tk.Label(root, text="色度抽样 (0=4:4:4, 1=4:2:2, 2=4:2:0):").grid(
-        row=5, column=0, sticky="e", pady=5
-    )
-    entry_subsampling = tk.Entry(root, width=10)
-    entry_subsampling.insert(0, "0")
-    entry_subsampling.grid(row=5, column=1, sticky="w", padx=5)
-
-    tk.Button(
-        root, text="确认并开始", command=confirm, width=20, bg="#4CAF50", fg="white"
-    ).grid(row=6, column=1, pady=20)
-
-    root.mainloop()
+            self.controller.show_result(logs)
 
 
-# GUI页面：MSPaint转存
-def get_mspaint_settings():
-    def browse_folder():
-        folder = filedialog.askdirectory(title="选择图片文件夹")
-        entry_path.delete(0, tk.END)
-        entry_path.insert(0, folder)
+class MsSettingsPage(BaseSettingsPage):
+    def __init__(self, parent, controller):
+        super().__init__(parent, controller)
 
-    def confirm():
-        folder_path = entry_path.get()
-        zip_jpg = var_jpg.get()
-        zip_png = var_png.get()
-        valid_size_min = float(entry_valid_size_min.get()) * 1024 * 1024
-        valid_size_max = float(entry_valid_size_max.get()) * 1024 * 1024
-        list_press_up = int(entry_jpg_press_up.get())
-        list_press_dw = int(entry_jpg_press_dw.get())
+        # MSPaint 特有参数
+        tk.Label(self, text="下拉单上移次数:").grid(row=4, column=0, sticky="e", pady=5)
+        self.entry_jpg_press_up = tk.Entry(self, width=10)
+        self.entry_jpg_press_up.insert(0, "3")
+        self.entry_jpg_press_up.grid(row=4, column=1, sticky="w", padx=5)
 
-        # GUI调用压缩Function
+        tk.Label(self, text="下拉单下移次数:").grid(row=5, column=0, sticky="e", pady=5)
+        self.entry_jpg_press_dw = tk.Entry(self, width=10)
+        self.entry_jpg_press_dw.insert(0, "0")
+        self.entry_jpg_press_dw.grid(row=5, column=1, sticky="w", padx=5)
+
+        # 按钮区域
+        btn_frame = tk.Frame(self)
+        btn_frame.grid(row=6, column=0, columnspan=5, pady=20)
+        tk.Button(
+            btn_frame,
+            text="返回",
+            command=lambda: controller.show_frame("MethodPage"),
+            width=10,
+        ).pack(side="left", padx=10)
+        tk.Button(
+            btn_frame,
+            text="确认并开始",
+            command=self.confirm,
+            width=20,
+            bg="#4CAF50",
+            fg="white",
+        ).pack(side="left", padx=10)
+
+    def confirm(self):
+        # 收集参数并调用逻辑
         confirm_delete = messagebox.askokcancel(
             "确认操作", "开始处理后将删除原始图片文件。\n是否继续？", icon="warning"
         )
-
         if confirm_delete:
-            root.destroy()
             start_conversion(
                 METHOD_MSPAINT,
-                folder_path,
-                zip_jpg,
-                zip_png,
-                valid_size_min,
-                valid_size_max,
-                list_press_up,
-                list_press_dw,
+                self.entry_path.get(),
+                self.var_jpg.get(),
+                self.var_png.get(),
+                float(self.entry_valid_size_min.get()) * 1024 * 1024,
+                float(self.entry_valid_size_max.get()) * 1024 * 1024,
+                int(self.entry_jpg_press_up.get()),
+                int(self.entry_jpg_press_dw.get()),
             )
-            # 输出结果
             from zip_logic import interceptor
 
             logs = "\n".join(interceptor.output)
-            gui_show_result(logs)
-
-    root = tk.Tk()
-    root.title("图片压缩设置")
-    root.geometry("760x300")
-
-    # 文件夹路径
-    tk.Label(root, text="文件夹路径:").grid(row=0, column=0, sticky="e", pady=5)
-    entry_path = tk.Entry(root, width=40)
-    entry_path.grid(row=0, column=1, columnspan=3, sticky="w", padx=5)
-    tk.Button(root, text="浏览...", command=browse_folder).grid(row=0, column=4, padx=5)
-
-    # 勾选框
-    var_jpg = tk.BooleanVar(value=False)
-    var_png = tk.BooleanVar(value=False)
-    tk.Checkbutton(root, text="压缩 JPG", variable=var_jpg).grid(
-        row=1, column=1, sticky="w"
-    )
-    tk.Checkbutton(root, text="转存 PNG→JPG", variable=var_png).grid(
-        row=2, column=1, sticky="w"
-    )
-
-    # 数值输入
-    tk.Label(root, text="大小范围 (MB):").grid(row=3, column=0, sticky="e", pady=5)
-    entry_valid_size_min = tk.Entry(root, width=10)
-    entry_valid_size_min.insert(0, "0.1")
-    entry_valid_size_min.grid(row=3, column=1, sticky="w", padx=5)
-
-    tk.Label(root, text="to ").grid(row=3, column=2)
-    entry_valid_size_max = tk.Entry(root, width=10)
-    entry_valid_size_max.insert(0, "20")
-    entry_valid_size_max.grid(row=3, column=3, sticky="w")
-
-    tk.Label(root, text="下拉单上移次数:").grid(row=4, column=0, sticky="e", pady=5)
-    entry_jpg_press_up = tk.Entry(root, width=10)
-    entry_jpg_press_up.insert(0, "3")
-    entry_jpg_press_up.grid(row=4, column=1, sticky="w", padx=5)
-
-    tk.Label(root, text="下拉单下移次数:").grid(row=5, column=0, sticky="e", pady=5)
-    entry_jpg_press_dw = tk.Entry(root, width=10)
-    entry_jpg_press_dw.insert(0, "0")
-    entry_jpg_press_dw.grid(row=5, column=1, sticky="w", padx=5)
-
-    tk.Button(
-        root, text="确认并开始", command=confirm, width=20, bg="#4CAF50", fg="white"
-    ).grid(row=6, column=1, pady=20)
-
-    root.mainloop()
+            self.controller.show_result(logs)
 
 
-# GUI页面：结果展示窗
-def gui_show_result(logs_text):
-    result_window = tk.Tk()
-    result_window.title("压缩执行结果")
-    result_window.geometry("1400x600")
+class ResultPage(tk.Frame):
+    # GUI结构：
+    #   grid()
+    #   ├─ 第0行：Label("压缩执行结果")
+    #   ├─ 第1行：text_frame (tk.Frame)
+    #   │    pack()
+    #   │    ├─ 左侧：self.text_area (tk.Text)
+    #   │    └─ 右侧：scrollbar (tk.Scrollbar)
+    #   └─ 第2行：Button("返回设置页")
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
 
-    # 创建一个带滚动条的文本框
-    text_area = tk.Text(result_window, wrap="word", font=("Consolas", 10))
-    scrollbar = tk.Scrollbar(result_window, command=text_area.yview)
-    text_area.config(yscrollcommand=scrollbar.set)
+        # 让第1行和第0列具有弹性权重
+        # 这样当窗口拉伸时，第1行的控件会跟着变大
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
-    scrollbar.pack(side="right", fill="y")
-    text_area.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        tk.Label(self, text="压缩执行结果", font=("Microsoft YaHei", 12, "bold")).grid(
+            row=0, column=0, pady=10
+        )
 
-    text_area.insert("1.0", logs_text)
-    text_area.config(state="disabled")
+        text_frame = tk.Frame(self)
+        # 让text_frame填满剩余空间，并随窗口拉伸
+        text_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
 
-    result_window.mainloop()
+        self.text_area = tk.Text(text_frame, wrap="none", font=("Consolas", 10))
+        v_scrollbar = tk.Scrollbar(text_frame, command=self.text_area.yview)
+        h_scrollbar = tk.Scrollbar(
+            text_frame, orient="horizontal", command=self.text_area.xview
+        )
+        self.text_area.config(
+            yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set
+        )
+
+        v_scrollbar.pack(side="right", fill="y")
+        h_scrollbar.pack(side="bottom", fill="x")
+        self.text_area.pack(side="left", fill="both", expand=True)
+
+        tk.Button(
+            self,
+            text="返回设置页",
+            command=lambda: controller.show_frame("PillowSettingsPage"),
+            bg="#2196F3",
+            fg="white",
+            width=15,
+        ).grid(row=2, column=0, pady=10)
+
+    def show_logs(self, logs_text):
+        self.text_area.config(state="normal")
+        self.text_area.delete("1.0", tk.END)
+        self.text_area.insert("1.0", logs_text)
+        self.text_area.config(state="disabled")
+        self.text_area.see(tk.END)  # 视图滚动到文本框的最底部

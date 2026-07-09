@@ -11,6 +11,22 @@ METHOD_MSPAINT = "M"
 TYPE_JPG = "jpg"
 TYPE_PNG = "png"
 
+# 结构：
+# OutputInterceptor (Class)  <-- 全局print拦截器 (内存 + 本地txt)
+#  │
+#  └── sys.stdout = interceptor  <-- 被start_conversion接管
+
+# start_conversion()
+#  │  ├─ 步骤逻辑：
+#  │  ├─ 1. 遍历文件夹 & 过滤条件 (类型、大小)
+#  │  ├─ 2. 调用 allocate_conversion_method() 分发任务
+#  │  └─ 3. 调用 print_output() 格式化输出
+#  │
+#  └── allocate_conversion_method()  <-- 转存，重命名，删除原文件
+#        │
+#        ├── Pillow
+#        └── MSPaint
+
 
 # 定义并实例化全局拦截器，用于拦截print内容
 class OutputInterceptor:
@@ -34,18 +50,7 @@ class OutputInterceptor:
 
 interceptor = OutputInterceptor()
 
-# 转存分为以下步骤：
-# start_conversion
-#   - 判定条件：1.大小、2.文件类型
-#   - 根据文件类型选取转存方法，allocate_conversion_method
-# allocate_conversion_method
-#   - 转存，重命名
-#   - 删除原文件
-# start_conversion
-#   - print结果
 
-
-# 1.判定条件、2.选取转存方法、3.print
 def start_conversion(
     conversion_method,
     folder_path,
@@ -62,7 +67,7 @@ def start_conversion(
 
     sys.stdout = interceptor
 
-    # 控制台输出size变化
+    # 格式化输出逻辑
     def print_output(original_size, new_size, convert_type, file_name):
         if original_size == 0:
             ratio = 0
@@ -107,6 +112,7 @@ def start_conversion(
         f"var_2: {var_2}",
     )
 
+    # 遍历，分发任务，结果输出
     for file_name in os.listdir(folder_path):
         file_path = os.path.join(folder_path, file_name)
         original_size = os.path.getsize(file_path)
