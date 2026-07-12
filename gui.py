@@ -41,6 +41,11 @@ class App(tk.Tk):
             # 将所有页面叠放在同一位置
             frame.grid(row=0, column=0, sticky="nsew")
 
+        # 让主窗口的第0行和第0列拥有“弹性权重”
+        # 这样拉伸主窗口时，主窗口会把多出来的空间分配给放在(0,0)位置的页面
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
         # 默认显示第一个页面
         self.show_frame("MethodPage")
 

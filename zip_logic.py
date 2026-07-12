@@ -3,7 +3,7 @@ import time
 import subprocess
 import pyautogui  # pip install pyautogui
 import pyperclip  # pip install pyperclip
-from PIL import Image
+from PIL import Image  # python -m pip install pillow
 from datetime import datetime
 
 METHOD_PILLOW = "P"

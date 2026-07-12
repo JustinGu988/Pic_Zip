@@ -8,10 +8,10 @@ venv/
 env/
 .venv/
 
-# --- 你的程序自动生成的日志 ---
+# --- 程序自动生成的日志 ---
 output_log.txt
 
-# --- Python 运行时缓存 ---
+# --- Python 运行缓存 ---
 __pycache__/
 *.py[cod]
 *.so
