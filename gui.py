@@ -2,7 +2,15 @@ import ctypes
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
-from zip_logic import start_conversion, METHOD_MSPAINT, METHOD_PILLOW
+from zip_logic import (
+    interceptor,
+    start_conversion,
+    shorten_tails,
+    METHOD_MSPAINT,
+    METHOD_PILLOW,
+)
+
+SHORTEN_TAILS = "ST"
 
 # 结构：
 # App (tk.Tk)  <-- 创建和切换页面
@@ -13,6 +21,8 @@ from zip_logic import start_conversion, METHOD_MSPAINT, METHOD_PILLOW
 #  │     │
 #  │     ├── PillowSettingsPage  <-- 继承，扩展特有参数
 #  │     └── MsSettingsPage      <-- 继承，扩展特有参数
+#  │
+#  ├── RenameSettingsPage (tk.Frame)  <-- 尾巴剪裁功能页面
 #  │
 #  └── ResultPage (tk.Frame)  <-- 结果页面
 
@@ -32,9 +42,17 @@ class App(tk.Tk):
 
         # 用于存储页面的容器
         self._frames = {}
+        # 记录当前显示的页面名称，默认首页
+        self.current_page = "MethodPage"
 
         # 初始化页面并放入容器
-        for F in (MethodPage, PillowSettingsPage, MsSettingsPage, ResultPage):
+        for F in (
+            MethodPage,
+            PillowSettingsPage,
+            MsSettingsPage,
+            ResultPage,
+            RenameSettingsPage,
+        ):
             page_name = F.__name__
             frame = F(parent=self, controller=self)
             self._frames[page_name] = frame
@@ -66,6 +84,9 @@ class App(tk.Tk):
 
     # 切换到指定页面
     def show_frame(self, page_name):
+        self.previous_page = self.current_page
+        self.current_page = page_name
+
         frame = self._frames[page_name]
         frame.tkraise()  # 将目标页面提升到最前面
         self.center_window()  # 每次切换页面重新居中
@@ -80,16 +101,17 @@ class MethodPage(tk.Frame):
         super().__init__(parent)
         self.controller = controller
 
-        tk.Label(self, text="选择图片转存方式：", font=("Microsoft YaHei", 11)).pack(
-            pady=15
-        )
+        tk.Label(self, text="选择功能：", font=("Microsoft YaHei", 11)).pack(pady=15)
 
         self.var_choice = tk.StringVar(value=METHOD_PILLOW)
         tk.Radiobutton(
-            self, text="Pillow", variable=self.var_choice, value=METHOD_PILLOW
+            self, text="Pillow转存", variable=self.var_choice, value=METHOD_PILLOW
         ).pack(anchor="w", padx=60)
         tk.Radiobutton(
-            self, text="MSPaint", variable=self.var_choice, value=METHOD_MSPAINT
+            self, text="MSPaint转存", variable=self.var_choice, value=METHOD_MSPAINT
+        ).pack(anchor="w", padx=60)
+        tk.Radiobutton(
+            self, text="尾巴剪裁", variable=self.var_choice, value=SHORTEN_TAILS
         ).pack(anchor="w", padx=60)
 
         tk.Button(
@@ -107,6 +129,8 @@ class MethodPage(tk.Frame):
             self.controller.show_frame("PillowSettingsPage")
         elif selected == METHOD_MSPAINT:
             self.controller.show_frame("MsSettingsPage")
+        elif selected == SHORTEN_TAILS:
+            self.controller.show_frame("RenameSettingsPage")
         else:
             messagebox.showinfo("提示", "Method Selection错误")
 
@@ -216,7 +240,6 @@ class PillowSettingsPage(BaseSettingsPage):
                 int(self.entry_quality.get()),
                 int(self.entry_subsampling.get()),
             )
-            from zip_logic import interceptor
 
             logs = "\n".join(interceptor.output)
             self.controller.show_result(logs)
@@ -271,7 +294,6 @@ class MsSettingsPage(BaseSettingsPage):
                 int(self.entry_jpg_press_up.get()),
                 int(self.entry_jpg_press_dw.get()),
             )
-            from zip_logic import interceptor
 
             logs = "\n".join(interceptor.output)
             self.controller.show_result(logs)
@@ -319,7 +341,7 @@ class ResultPage(tk.Frame):
         tk.Button(
             self,
             text="返回设置页",
-            command=lambda: controller.show_frame("PillowSettingsPage"),
+            command=lambda: controller.show_frame(controller.previous_page),
             bg="#2196F3",
             fg="white",
             width=15,
@@ -331,3 +353,68 @@ class ResultPage(tk.Frame):
         self.text_area.insert("1.0", logs_text)
         self.text_area.config(state="disabled")
         self.text_area.see(tk.END)  # 视图滚动到文本框的最底部
+
+
+class RenameSettingsPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+
+        tk.Label(
+            self, text="文件名裁剪设置", font=("Microsoft YaHei", 12, "bold")
+        ).grid(row=0, column=0, columnspan=3, pady=15)
+
+        # 文件夹路径
+        tk.Label(self, text="文件夹路径:").grid(row=1, column=0, sticky="e", pady=5)
+        self.entry_path = tk.Entry(self, width=40)
+        self.entry_path.grid(row=1, column=1, sticky="w", padx=5)
+        tk.Button(self, text="浏览...", command=self.browse_folder).grid(
+            row=1, column=2, padx=5
+        )
+
+        # 勾选框
+        self.var_and_more = tk.BooleanVar(value=True)
+        self.var_tails = tk.BooleanVar(value=True)
+
+        tk.Checkbutton(self, text="裁剪 'and_X_more'", variable=self.var_and_more).grid(
+            row=2, column=1, sticky="w", pady=10
+        )
+        tk.Checkbutton(self, text="裁剪尾巴", variable=self.var_tails).grid(
+            row=3, column=1, sticky="w"
+        )
+
+        # 按钮区域
+        btn_frame = tk.Frame(self)
+        btn_frame.grid(row=4, column=0, columnspan=3, pady=20)
+        tk.Button(
+            btn_frame,
+            text="返回",
+            command=lambda: controller.show_frame("MethodPage"),
+            width=10,
+        ).pack(side="left", padx=10)
+        tk.Button(
+            btn_frame,
+            text="开始裁剪",
+            command=self.confirm,
+            width=20,
+            bg="#4CAF50",
+            fg="white",
+        ).pack(side="left", padx=10)
+
+    def browse_folder(self):
+        folder = filedialog.askdirectory(title="选择图片文件夹")
+        self.entry_path.delete(0, tk.END)
+        self.entry_path.insert(0, folder)
+
+    def confirm(self):
+        folder_path = self.entry_path.get()
+        if not folder_path:
+            messagebox.showwarning("提示", "请先选择文件夹！")
+            return
+
+        # 调用逻辑函数
+        shorten_tails(folder_path, self.var_and_more.get(), self.var_tails.get())
+        logs = "\n".join(interceptor.output)
+
+        # 展示结果
+        self.controller.show_result(logs)
